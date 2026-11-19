@@ -1,0 +1,2367 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseRoom — Public Community Chat</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          keyframes: {
+            popIn: {
+              '0%': { opacity: '0', transform: 'translateY(8px) scale(0.98)' },
+              '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+            },
+            bounceDot: {
+              '0%, 80%, 100%': { transform: 'scale(0.6)', opacity: '0.4' },
+              '40%': { transform: 'scale(1)', opacity: '1' },
+            }
+          },
+          animation: {
+            popIn: 'popIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            dot1: 'bounceDot 1.4s infinite ease-in-out both',
+            dot2: 'bounceDot 1.4s infinite ease-in-out 0.2s both',
+            dot3: 'bounceDot 1.4s infinite ease-in-out 0.4s both',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Custom subtle scrollbars for message feed and sidebars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.55);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-indigo-500 selection:text-white overflow-hidden h-screen w-screen">
+
+  <!-- Toast Notification Container (Replaces browser alerts) -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0"></div>
+
+  <!-- Authentication Modal (Log In & Create Account) -->
+  <div id="auth-modal" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-7 my-auto animate-popIn">
+      <!-- Brand Header -->
+      <div class="flex items-center justify-between gap-3 mb-5">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xl shadow-md shadow-indigo-600/20 shrink-0">
+            💬
+          </div>
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">PulseRoom</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Real-time public community chat</p>
+          </div>
+        </div>
+        <span id="connection-mode-badge" class="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          ● Live Ready
+        </span>
+      </div>
+
+      <!-- Auth Mode Tabs -->
+      <div class="grid grid-cols-2 gap-1.5 p-1 mb-5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700/70">
+        <button
+          type="button"
+          id="tab-login-btn"
+          class="py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+        >
+          Log In
+        </button>
+        <button
+          type="button"
+          id="tab-signup-btn"
+          class="py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+        >
+          Create Account
+        </button>
+      </div>
+
+      <!-- Inline Error Alert Banner -->
+      <div id="auth-error-box" class="hidden mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+        <span class="shrink-0 mt-0.5">⚠️</span>
+        <span id="auth-error-text" class="leading-relaxed"></span>
+      </div>
+
+      <!-- LOG IN FORM -->
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label for="login-username" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Username</label>
+          <input
+            id="login-username"
+            type="text"
+            maxlength="20"
+            autocomplete="username"
+            placeholder="Enter your username..."
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition"
+            required
+          />
+        </div>
+
+        <div>
+          <label for="login-password" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Password</label>
+          <div class="relative">
+            <input
+              id="login-password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Enter your password..."
+              class="w-full pl-3.5 pr-11 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition"
+              required
+            />
+            <button type="button" data-toggle-pass="login-password" class="toggle-pass-btn absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1" aria-label="Toggle password visibility">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          id="login-submit-btn"
+          class="w-full mt-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 transition flex items-center justify-center gap-2"
+        >
+          <span id="login-btn-label">Log In</span>
+          <span id="login-spinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+        </button>
+
+        <p class="text-center text-xs text-slate-500 dark:text-slate-400 pt-1">
+          New to PulseRoom?
+          <button type="button" id="switch-to-signup-link" class="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">Create an account</button>
+        </p>
+      </form>
+
+      <!-- CREATE ACCOUNT FORM -->
+      <form id="signup-form" class="hidden space-y-3.5">
+        <!-- Live Avatar Preview -->
+        <div class="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+          <div id="signup-preview-avatar" class="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-2xl shadow-inner shrink-0 transition-colors duration-200 text-white">
+            🦊
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span id="signup-preview-name" class="font-semibold text-sm truncate">CosmicFox</span>
+              <span id="signup-preview-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 shrink-0">
+                Chilling
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Live profile preview</p>
+          </div>
+        </div>
+
+        <!-- Username -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="signup-username" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Username</label>
+            <button type="button" id="signup-random-name-btn" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+              🎲 Randomize
+            </button>
+          </div>
+          <input
+            id="signup-username"
+            type="text"
+            minlength="3"
+            maxlength="20"
+            autocomplete="username"
+            placeholder="3-20 characters..."
+            class="w-full px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition"
+            required
+          />
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label for="signup-password" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Password (6+ characters)</label>
+          <div class="relative">
+            <input
+              id="signup-password"
+              type="password"
+              minlength="6"
+              autocomplete="new-password"
+              placeholder="Create a password (min 6 chars)..."
+              class="w-full pl-3.5 pr-11 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition"
+              required
+            />
+            <button type="button" data-toggle-pass="signup-password" class="toggle-pass-btn absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1" aria-label="Toggle password visibility">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <!-- Status Tag Selector -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Status Tag</label>
+          <div id="signup-badge-selector" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <!-- Avatar Emoji Selector -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Avatar Emoji</label>
+          <div id="signup-emoji-grid" class="grid grid-cols-8 gap-1.5"></div>
+        </div>
+
+        <!-- Avatar Color Selector -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Avatar Color</label>
+          <div id="signup-color-grid" class="flex items-center justify-between gap-2"></div>
+        </div>
+
+        <button
+          type="submit"
+          id="signup-submit-btn"
+          class="w-full mt-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 transition flex items-center justify-center gap-2"
+        >
+          <span id="signup-btn-label">Create Account & Join</span>
+          <span id="signup-spinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+        </button>
+
+        <p class="text-center text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+          Already have an account?
+          <button type="button" id="switch-to-login-link" class="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">Log in</button>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal (For Signed-In Users) -->
+  <div id="edit-profile-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-popIn">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold tracking-tight">Edit Profile</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Changes update live across the chat room</p>
+        </div>
+        <button id="close-edit-modal-btn" type="button" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition" aria-label="Close">
+          ✕
+        </button>
+      </div>
+
+      <!-- Live Edit Avatar Preview -->
+      <div class="flex items-center gap-3.5 p-3 mb-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+        <div id="edit-preview-avatar" class="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-2xl shadow-inner shrink-0 transition-colors text-white">
+          🦊
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span id="edit-preview-name" class="font-semibold text-sm truncate">User</span>
+            <span id="edit-preview-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 shrink-0">
+              Chilling
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Public member profile</p>
+        </div>
+      </div>
+
+      <form id="edit-profile-form" class="space-y-3.5">
+        <div>
+          <label for="edit-username-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Username</label>
+          <input
+            id="edit-username-input"
+            type="text"
+            minlength="3"
+            maxlength="20"
+            class="w-full px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition"
+            required
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Status Tag</label>
+          <div id="edit-badge-selector" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Avatar Emoji</label>
+          <div id="edit-emoji-grid" class="grid grid-cols-8 gap-1.5"></div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Avatar Color</label>
+          <div id="edit-color-grid" class="flex items-center justify-between gap-2"></div>
+        </div>
+
+        <button
+          type="submit"
+          id="save-profile-btn"
+          class="w-full mt-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 transition flex items-center justify-center gap-2"
+        >
+          <span>Save Profile</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Mobile Backdrop Overlay for Drawers -->
+  <div id="mobile-backdrop" class="fixed inset-0 z-20 bg-slate-950/60 backdrop-blur-xs hidden lg:hidden"></div>
+
+  <!-- Main Application Shell -->
+  <div class="flex h-full w-full overflow-hidden">
+
+    <!-- LEFT SIDEBAR: Channels & Current User Profile -->
+    <aside id="left-sidebar" class="fixed inset-y-0 left-0 z-30 w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-200 ease-out">
+      <!-- Brand Header -->
+      <div class="h-16 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow-sm">
+            💬
+          </div>
+          <div>
+            <h1 class="font-bold text-base leading-tight">PulseRoom</h1>
+            <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Live Lobby
+            </span>
+          </div>
+        </div>
+
+        <!-- Theme & Sound Toggles -->
+        <div class="flex items-center gap-1">
+          <button id="sound-toggle-btn" type="button" title="Toggle Notification Sounds" class="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            🔔
+          </button>
+          <button id="theme-toggle-btn" type="button" title="Toggle Dark/Light Mode" class="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            ☀️
+          </button>
+        </div>
+      </div>
+
+      <!-- Channels List -->
+      <div class="flex-1 overflow-y-auto p-3 space-y-5">
+        <div>
+          <div class="px-2.5 mb-2 flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Public Channels</span>
+            <span class="text-[11px] text-slate-400">4 Rooms</span>
+          </div>
+          <nav id="channel-list" class="space-y-1">
+            <!-- Channels injected here -->
+          </nav>
+        </div>
+
+        <!-- Community Guidelines Card -->
+        <div class="p-3.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50">
+          <div class="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-semibold text-xs mb-1">
+            <span>🛡️</span>
+            <span>Safe & Welcoming Chat</span>
+          </div>
+          <p class="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+            Be kind, respect everyone, and keep personal info private. Auto-filter is active.
+          </p>
+        </div>
+      </div>
+
+      <!-- Bottom User Profile Card -->
+      <div class="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/90 shrink-0">
+        <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/70 shadow-xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div id="sidebar-user-avatar" class="w-9 h-9 rounded-xl bg-indigo-500 flex items-center justify-center text-lg shrink-0 text-white">
+              🦊
+            </div>
+            <div class="min-w-0">
+              <div id="sidebar-user-name" class="text-sm font-semibold truncate">Not Signed In</div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span id="sidebar-user-badge" class="text-[11px] text-slate-500 dark:text-slate-400 truncate">Chilling</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button id="edit-profile-btn" type="button" title="Edit Profile" class="p-2 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+              ✏️
+            </button>
+            <button id="logout-btn" type="button" title="Log Out" class="p-2 rounded-lg text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition">
+              🚪
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Main Chat Feed Area -->
+    <main class="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 relative">
+      <!-- Top Channel Header -->
+      <header class="h-16 px-4 sm:px-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0 z-10">
+        <div class="flex items-center gap-3 min-w-0">
+          <!-- Mobile Menu Button -->
+          <button id="open-left-drawer-btn" type="button" class="lg:hidden p-2 -ml-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition" aria-label="Open Channels">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span id="header-channel-icon" class="text-lg">💬</span>
+              <h2 id="header-channel-name" class="font-bold text-base sm:text-lg truncate"># general</h2>
+            </div>
+            <p id="header-channel-desc" class="text-xs text-slate-500 dark:text-slate-400 truncate hidden sm:block">
+              Hang out, say hello, and chat about anything!
+            </p>
+          </div>
+        </div>
+
+        <!-- Right Header Controls -->
+        <div class="flex items-center gap-2 shrink-0">
+          <!-- Profanity Filter Status Pill -->
+          <button id="filter-status-btn" type="button" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20 hover:opacity-90 transition">
+            <span>🛡️</span>
+            <span id="filter-status-text">Filter: On</span>
+          </button>
+
+          <!-- Online Users Drawer Button (Mobile/Tablet) -->
+          <button id="open-right-drawer-btn" type="button" class="xl:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="mobile-online-count">0 Online</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Messages Container -->
+      <div id="messages-container" class="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4">
+        <!-- Messages rendered here dynamically -->
+      </div>
+
+      <!-- Typing Indicator Bar -->
+      <div id="typing-indicator" class="px-5 py-1.5 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 h-7 shrink-0 opacity-0 transition-opacity duration-200">
+        <div class="flex items-center gap-1 bg-slate-200/80 dark:bg-slate-800 px-2 py-1 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 dark:bg-slate-400 animate-dot1"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 dark:bg-slate-400 animate-dot2"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 dark:bg-slate-400 animate-dot3"></span>
+        </div>
+        <span id="typing-text" class="font-medium">Someone is typing...</span>
+      </div>
+
+      <!-- Message Composer Footer -->
+      <footer class="p-3 sm:p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 relative">
+        <!-- Reply Quote Preview Banner -->
+        <div id="reply-banner" class="hidden mb-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/90 border-l-4 border-indigo-500 flex items-center justify-between gap-2 text-xs">
+          <div class="min-w-0">
+            <span class="font-semibold text-indigo-600 dark:text-indigo-400">Replying to <span id="reply-target-name">User</span>:</span>
+            <p id="reply-target-text" class="text-slate-600 dark:text-slate-300 truncate mt-0.5"></p>
+          </div>
+          <button id="cancel-reply-btn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            ✕
+          </button>
+        </div>
+
+        <!-- Emoji Picker Popover -->
+        <div id="emoji-picker-popover" class="hidden absolute bottom-20 left-4 sm:left-6 z-30 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl p-3 animate-popIn">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-700">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Insert Emoji</span>
+            <button id="close-emoji-picker" type="button" class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">✕</button>
+          </div>
+          <div id="composer-emoji-grid" class="grid grid-cols-8 gap-1 max-h-44 overflow-y-auto">
+            <!-- Emojis injected here -->
+          </div>
+        </div>
+
+        <!-- Input Form -->
+        <form id="message-form" class="flex items-end gap-2 max-w-5xl mx-auto">
+          <button
+            type="button"
+            id="emoji-picker-btn"
+            title="Add Emoji"
+            class="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-lg leading-none transition shrink-0"
+          >
+            😊
+          </button>
+
+          <div class="flex-1 relative">
+            <textarea
+              id="message-input"
+              rows="1"
+              maxlength="400"
+              placeholder="Message #general... (Enter to send, Shift+Enter for new line)"
+              class="w-full pl-4 pr-14 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800/90 focus:outline-none text-sm transition resize-none max-h-28 overflow-y-auto leading-snug block"
+            ></textarea>
+            <span id="char-counter" class="absolute right-3 bottom-3 text-[10px] text-slate-400 pointer-events-none">
+              0/400
+            </span>
+          </div>
+
+          <button
+            type="submit"
+            class="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-sm shadow-md shadow-indigo-600/20 transition flex items-center gap-1.5 shrink-0"
+          >
+            <span class="hidden sm:inline">Send</span>
+            <svg class="w-4 h-4 transform rotate-45 -mt-0.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        </form>
+      </footer>
+    </main>
+
+    <!-- RIGHT SIDEBAR: Online Community Members -->
+    <aside id="right-sidebar" class="fixed inset-y-0 right-0 z-30 w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col transform translate-x-full xl:translate-x-0 xl:static transition-transform duration-200 ease-out">
+      <div class="h-16 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <h3 class="font-bold text-sm">Online Members</h3>
+        </div>
+        <span id="online-count-badge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+          0
+        </span>
+      </div>
+
+      <div id="online-users-list" class="flex-1 overflow-y-auto p-3 space-y-1.5">
+        <!-- Online users injected dynamically -->
+      </div>
+
+      <div class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 text-center">
+        Tip: Click a member to @mention them
+      </div>
+    </aside>
+
+  </div>
+
+  <script type="module">
+    /*************************************************************************
+     * 1. FIREBASE INITIALIZATION & RESILIENT BACKEND ADAPTER
+     *************************************************************************/
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import {
+      getAuth,
+      signInAnonymously,
+      signInWithCustomToken
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc,
+      updateDoc,
+      deleteDoc,
+      addDoc,
+      onSnapshot,
+      collection,
+      serverTimestamp,
+      arrayUnion,
+      arrayRemove
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' && __app_id ? __app_id : 'pulseroom-chat';
+
+    function parseFirebaseConfig() {
+      try {
+        if (typeof __firebase_config === 'undefined' || !__firebase_config) return null;
+        const parsed = typeof __firebase_config === 'string'
+          ? JSON.parse(__firebase_config)
+          : __firebase_config;
+        if (parsed && typeof parsed === 'object' && parsed.apiKey && parsed.projectId) {
+          return parsed;
+        }
+      } catch (e) {
+        console.warn('Could not parse Firebase config; using in-memory room fallback.', e);
+      }
+      return null;
+    }
+
+    const firebaseConfig = parseFirebaseConfig();
+    let app = null;
+    let auth = null;
+    let db = null;
+    let authSessionPromise = null;
+    let useCloudBackend = false;
+
+    if (firebaseConfig) {
+      try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        useCloudBackend = true;
+      } catch (e) {
+        console.warn('Firebase initialization fallback triggered:', e);
+        useCloudBackend = false;
+      }
+    }
+
+    // Strict Firestore Collection Helpers (/artifacts/{appId}/public/data/{collectionName})
+    const getAccountDoc = (normalizedUsername) =>
+      doc(db, 'artifacts', appId, 'public', 'data', 'accounts', normalizedUsername);
+    const getMessagesCol = () =>
+      collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+    const getMessageDoc = (msgId) =>
+      doc(db, 'artifacts', appId, 'public', 'data', 'messages', msgId);
+    const getPresenceCol = () =>
+      collection(db, 'artifacts', appId, 'public', 'data', 'presence');
+    const getPresenceDoc = (accountId) =>
+      doc(db, 'artifacts', appId, 'public', 'data', 'presence', accountId);
+
+    // In-memory + BroadcastChannel fallback store when running without cloud config
+    const localMemoryStore = {
+      accounts: new Map(),
+      messages: new Map(),
+      presence: new Map(),
+      listeners: { messages: new Set(), presence: new Set() },
+      channel: typeof BroadcastChannel !== 'undefined'
+        ? new BroadcastChannel(`pulseroom_sync_${appId}`)
+        : null
+    };
+
+    function notifyLocalListeners(type) {
+      localMemoryStore.listeners[type].forEach((fn) => fn());
+    }
+
+    function broadcastLocalSync(payload) {
+      if (localMemoryStore.channel) {
+        try {
+          localMemoryStore.channel.postMessage(payload);
+        } catch (e) {
+          // Ignore BroadcastChannel errors
+        }
+      }
+    }
+
+    if (localMemoryStore.channel) {
+      localMemoryStore.channel.onmessage = (event) => {
+        const data = event.data;
+        if (!data || !data.type) return;
+        if (data.type === 'ACCOUNT_UPSERT' && data.account) {
+          localMemoryStore.accounts.set(data.account.normalizedUsername, data.account);
+        } else if (data.type === 'ACCOUNT_DELETE' && data.normalizedUsername) {
+          localMemoryStore.accounts.delete(data.normalizedUsername);
+        } else if (data.type === 'MESSAGE_UPSERT' && data.message) {
+          localMemoryStore.messages.set(data.message.id, data.message);
+          notifyLocalListeners('messages');
+        } else if (data.type === 'MESSAGE_DELETE' && data.id) {
+          localMemoryStore.messages.delete(data.id);
+          notifyLocalListeners('messages');
+        } else if (data.type === 'PRESENCE_UPSERT' && data.presence) {
+          localMemoryStore.presence.set(data.presence.uid, data.presence);
+          notifyLocalListeners('presence');
+        } else if (data.type === 'SYNC_REQUEST') {
+          localMemoryStore.accounts.forEach((account) =>
+            broadcastLocalSync({ type: 'ACCOUNT_UPSERT', account })
+          );
+          localMemoryStore.messages.forEach((message) =>
+            broadcastLocalSync({ type: 'MESSAGE_UPSERT', message })
+          );
+          localMemoryStore.presence.forEach((presence) =>
+            broadcastLocalSync({ type: 'PRESENCE_UPSERT', presence })
+          );
+        }
+      };
+      broadcastLocalSync({ type: 'SYNC_REQUEST' });
+    }
+
+    /*************************************************************************
+     * 2. CONFIGURATION & DATA CONSTANTS
+     *************************************************************************/
+    const CHANNELS = [
+      { id: 'general', name: 'general', icon: '💬', desc: 'Hang out, say hello, and chat about anything!', unread: 0 },
+      { id: 'homework-help', name: 'homework-help', icon: '📚', desc: 'Study together, share tips, and ask school questions.', unread: 0 },
+      { id: 'gaming', name: 'gaming', icon: '🎮', desc: 'Discuss favorite games, high scores, and squad ups.', unread: 0 },
+      { id: 'random', name: 'random', icon: '🎲', desc: 'Fun facts, jokes, music, and random thoughts.', unread: 0 }
+    ];
+
+    const AVATAR_EMOJIS = [
+      '🦊', '🐼', '🐯', '🐸', '🦉', '🦄', '🐙', '🐝',
+      '🚀', '⚡', '🌈', '🎧', '🎨', '🏀', '🌟', '🍀'
+    ];
+
+    const AVATAR_COLORS = [
+      'bg-indigo-500',
+      'bg-violet-500',
+      'bg-emerald-500',
+      'bg-sky-500',
+      'bg-amber-500',
+      'bg-rose-500',
+      'bg-pink-500',
+      'bg-teal-500'
+    ];
+
+    const STATUS_TAGS = ['Chilling', 'Studying', 'Gaming', 'Vibing', 'Creative', 'AFK'];
+
+    const COMPOSER_EMOJIS = [
+      '😀', '😂', '🥹', '😎', '🤩', '🥳', '🤔', '🙌',
+      '👏', '👍', '❤️', '🔥', '✨', '🎉', '💯', '🚀',
+      '🎮', '📚', '🎧', '🎨', '🍕', '☕', '🌈', '⚡',
+      '🐶', '🐱', '🦊', '🐼', '🐸', '🦄', '👀', '💡'
+    ];
+
+    const QUICK_REACTIONS = ['👍', '❤️', '😂', '🔥', '🎉'];
+
+    const PROFANITY_LIST = [
+      'damn', 'hell', 'crap', 'stupid', 'idiot', 'shut up', 'jerk', 'dumb'
+    ];
+
+    /*************************************************************************
+     * 3. APPLICATION STATE
+     *************************************************************************/
+    const state = {
+      currentUser: null, // { uid, username, normalizedUsername, avatarEmoji, avatarColor, status }
+      signupDraft: {
+        username: 'CosmicFox',
+        avatarEmoji: '🦊',
+        avatarColor: 'bg-indigo-500',
+        status: 'Chilling'
+      },
+      editDraft: {
+        username: '',
+        avatarEmoji: '🦊',
+        avatarColor: 'bg-indigo-500',
+        status: 'Chilling'
+      },
+      activeChannel: 'general',
+      allMessages: [],
+      onlineMembers: [],
+      rawPresenceDocs: [],
+      replyingTo: null, // { id, username, text }
+      filterEnabled: true,
+      soundEnabled: true,
+      initialMessagesLoaded: false,
+      forceScrollNextRender: true,
+      unsubMessages: null,
+      unsubPresence: null,
+      heartbeatTimer: null,
+      typingCleanupTimer: null,
+      typingClearTimeout: null,
+      lastTypingSentAt: 0,
+      confirmDeleteId: null
+    };
+
+    /*************************************************************************
+     * 4. UTILITY & CRYPTO FUNCTIONS
+     *************************************************************************/
+    const randomAdjectives = ['Cosmic', 'Neon', 'Happy', 'Swift', 'Pixel', 'Sunny', 'Clever', 'Lucky'];
+    const randomNouns = ['Fox', 'Panda', 'Tiger', 'Owl', 'Comet', 'Otter', 'Falcon', 'Spark'];
+
+    function generateRandomUsername() {
+      const adj = randomAdjectives[Math.floor(Math.random() * randomAdjectives.length)];
+      const noun = randomNouns[Math.floor(Math.random() * randomNouns.length)];
+      const num = Math.floor(10 + Math.random() * 89);
+      return `${adj}${noun}${num}`;
+    }
+
+    function cleanUsernameDisplay(name) {
+      return (name || '').trim().replace(/\s+/g, ' ');
+    }
+
+    function normalizeUsername(name) {
+      return cleanUsernameDisplay(name).toLowerCase();
+    }
+
+    function validateUsername(name) {
+      const cleaned = cleanUsernameDisplay(name);
+      if (cleaned.length < 3 || cleaned.length > 20) {
+        return 'Username must be between 3 and 20 characters.';
+      }
+      if (!/^[a-zA-Z0-9 _.-]+$/.test(cleaned)) {
+        return 'Username can only use letters, numbers, spaces, underscores, dots, or hyphens.';
+      }
+      return null;
+    }
+
+    function escapeHTML(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function filterMessageText(text) {
+      if (!state.filterEnabled) return text;
+      let clean = text;
+      PROFANITY_LIST.forEach((word) => {
+        const regex = new RegExp(`\\b${word}\\b`, 'gi');
+        clean = clean.replace(regex, (match) => '*'.repeat(match.length));
+      });
+      return clean;
+    }
+
+    function getTimestampMillis(ts) {
+      if (!ts) return Date.now();
+      if (typeof ts.toMillis === 'function') return ts.toMillis();
+      if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+      if (typeof ts === 'number') return ts;
+      const parsed = Date.parse(ts);
+      return Number.isNaN(parsed) ? Date.now() : parsed;
+    }
+
+    function formatTime(ts) {
+      const d = new Date(getTimestampMillis(ts));
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatMessageHTML(rawText) {
+      let escaped = escapeHTML(rawText);
+      escaped = escaped.replace(
+        /(^|\s)(@[a-zA-Z0-9_.-]{2,20})/g,
+        '$1<span class="px-1.5 py-0.5 rounded-md bg-indigo-500/15 dark:bg-indigo-400/20 text-indigo-700 dark:text-indigo-300 font-semibold">$2</span>'
+      );
+      return escaped.replace(/\n/g, '<br />');
+    }
+
+    function showToast(message, icon = '✨') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white border border-slate-700/80 shadow-xl text-xs sm:text-sm font-medium animate-popIn';
+      toast.innerHTML = `<span class="text-base shrink-0">${icon}</span><span class="leading-snug">${escapeHTML(message)}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-6px)';
+        toast.style.transition = 'all 0.2s ease';
+        setTimeout(() => toast.remove(), 220);
+      }, 3200);
+    }
+
+    function playPopSound() {
+      if (!state.soundEnabled) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(580, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(840, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.13);
+      } catch (e) {
+        // Ignore audio context autoplay restrictions
+      }
+    }
+
+    // Cryptographic salt & SHA-256 hashing with pure-JS fallback for sandboxed iframes
+    function generateSalt() {
+      try {
+        if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+          const arr = new Uint8Array(16);
+          window.crypto.getRandomValues(arr);
+          return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+        }
+      } catch (e) {
+        // Fallback below
+      }
+      let out = '';
+      for (let i = 0; i < 32; i++) {
+        out += Math.floor(Math.random() * 16).toString(16);
+      }
+      return out;
+    }
+
+    function sha256Fallback(ascii) {
+      function rightRotate(value, amount) {
+        return (value >>> amount) | (value << (32 - amount));
+      }
+      const mathPow = Math.pow;
+      const maxWord = mathPow(2, 32);
+      let result = '';
+      const words = [];
+      const asciiBitLength = ascii.length * 8;
+
+      const hash = [];
+      const k = [];
+      let primeCounter = 0;
+      const isComposite = {};
+
+      for (let candidate = 2; primeCounter < 64; candidate++) {
+        if (!isComposite[candidate]) {
+          for (let i = 0; i < 313; i += candidate) {
+            isComposite[i] = candidate;
+          }
+          hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+          k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+        }
+      }
+
+      ascii += '\x80';
+      while ((ascii.length % 64) - 56) ascii += '\x00';
+      for (let i = 0; i < ascii.length; i++) {
+        const j = ascii.charCodeAt(i);
+        words[i >> 2] |= j << (((3 - i) % 4) * 8);
+      }
+      words[words.length] = (asciiBitLength / maxWord) | 0;
+      words[words.length] = asciiBitLength;
+
+      for (let j = 0; j < words.length; ) {
+        const w = words.slice(j, (j += 16));
+        const oldHash = hash.slice(0);
+
+        for (let i = 0; i < 64; i++) {
+          const w15 = w[i - 15];
+          const w2 = w[i - 2];
+          const a = hash[0];
+          const e = hash[4];
+          const temp1 =
+            hash[7] +
+            (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) +
+            ((e & hash[5]) ^ (~e & hash[6])) +
+            k[i] +
+            (w[i] =
+              i < 16
+                ? w[i]
+                : (w[i - 16] +
+                    (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) +
+                    w[i - 7] +
+                    (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) |
+                  0);
+          const temp2 =
+            (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) +
+            ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+
+          hash.unshift((temp1 + temp2) | 0);
+          hash[4] = (hash[4] + temp1) | 0;
+          hash.pop();
+        }
+
+        for (let i = 0; i < 8; i++) {
+          hash[i] = (hash[i] + oldHash[i]) | 0;
+        }
+      }
+
+      for (let i = 0; i < 8; i++) {
+        for (let j = 3; j + 1; j--) {
+          const b = (hash[i] >> (j * 8)) & 255;
+          result += (b < 16 ? 0 : '') + b.toString(16);
+        }
+      }
+      return result;
+    }
+
+    async function hashPassword(password, salt) {
+      const combined = `${salt}:${password}`;
+      try {
+        if (window.crypto && window.crypto.subtle && typeof window.crypto.subtle.digest === 'function') {
+          const encoder = new TextEncoder();
+          const data = encoder.encode(combined);
+          const digest = await window.crypto.subtle.digest('SHA-256', data);
+          return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+        }
+      } catch (e) {
+        // Fallback below if subtle crypto is blocked
+      }
+      return sha256Fallback(combined);
+    }
+
+    /*************************************************************************
+     * 5. FIREBASE SESSION & UNIFIED STORAGE OPERATIONS
+     *************************************************************************/
+    async function ensureFirebaseAuthSession() {
+      if (!useCloudBackend || !auth) return null;
+      if (auth.currentUser) return auth.currentUser;
+      if (authSessionPromise) return authSessionPromise;
+
+      authSessionPromise = (async () => {
+        try {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            try {
+              const cred = await signInWithCustomToken(auth, __initial_auth_token);
+              return cred.user;
+            } catch (tokenErr) {
+              const anonCred = await signInAnonymously(auth);
+              return anonCred.user;
+            }
+          } else {
+            const anonCred = await signInAnonymously(auth);
+            return anonCred.user;
+          }
+        } catch (err) {
+          console.warn('Cloud auth unavailable, switching to local room mode:', err);
+          useCloudBackend = false;
+          updateConnectionModeBadge();
+          return null;
+        } finally {
+          authSessionPromise = null;
+        }
+      })();
+
+      return authSessionPromise;
+    }
+
+    function updateConnectionModeBadge() {
+      const badge = document.getElementById('connection-mode-badge');
+      if (!badge) return;
+      if (useCloudBackend) {
+        badge.textContent = '● Live Cloud';
+        badge.className = 'text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+      } else {
+        badge.textContent = '● Local Room';
+        badge.className = 'text-[10px] font-semibold px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20';
+      }
+    }
+
+    async function fetchAccountRecord(normalizedUsername) {
+      if (useCloudBackend && db) {
+        try {
+          const user = await ensureFirebaseAuthSession();
+          if (user) {
+            const snap = await getDoc(getAccountDoc(normalizedUsername));
+            return snap.exists() ? snap.data() : null;
+          }
+        } catch (err) {
+          console.warn('Cloud account fetch error, falling back to local store:', err);
+          useCloudBackend = false;
+          updateConnectionModeBadge();
+        }
+      }
+      return localMemoryStore.accounts.get(normalizedUsername) || null;
+    }
+
+    async function saveAccountRecord(normalizedUsername, accountData, isNew = false) {
+      if (useCloudBackend && db) {
+        try {
+          const user = await ensureFirebaseAuthSession();
+          if (user) {
+            if (isNew) {
+              await setDoc(getAccountDoc(normalizedUsername), {
+                ...accountData,
+                createdAt: serverTimestamp()
+              });
+            } else {
+              await setDoc(getAccountDoc(normalizedUsername), accountData, { merge: true });
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn('Cloud account save error, falling back to local store:', err);
+          useCloudBackend = false;
+          updateConnectionModeBadge();
+        }
+      }
+      const record = { ...accountData, createdAt: accountData.createdAt || Date.now() };
+      localMemoryStore.accounts.set(normalizedUsername, record);
+      broadcastLocalSync({ type: 'ACCOUNT_UPSERT', account: record });
+    }
+
+    async function removeAccountRecord(normalizedUsername) {
+      if (useCloudBackend && db) {
+        try {
+          const user = await ensureFirebaseAuthSession();
+          if (user) {
+            await deleteDoc(getAccountDoc(normalizedUsername));
+            return;
+          }
+        } catch (err) {
+          console.warn('Cloud account delete error:', err);
+        }
+      }
+      localMemoryStore.accounts.delete(normalizedUsername);
+      broadcastLocalSync({ type: 'ACCOUNT_DELETE', normalizedUsername });
+    }
+
+    /*************************************************************************
+     * 6. AUTHENTICATION HANDLERS (SIGN UP, LOG IN, LOG OUT)
+     *************************************************************************/
+    function showAuthError(msg) {
+      const box = document.getElementById('auth-error-box');
+      const text = document.getElementById('auth-error-text');
+      if (!box || !text) return;
+      text.textContent = msg;
+      box.classList.remove('hidden');
+    }
+
+    function clearAuthError() {
+      const box = document.getElementById('auth-error-box');
+      if (box) box.classList.add('hidden');
+    }
+
+    function switchAuthTab(mode) {
+      clearAuthError();
+      const loginTab = document.getElementById('tab-login-btn');
+      const signupTab = document.getElementById('tab-signup-btn');
+      const loginForm = document.getElementById('login-form');
+      const signupForm = document.getElementById('signup-form');
+
+      if (mode === 'login') {
+        loginTab.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs';
+        signupTab.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200';
+        loginForm.classList.remove('hidden');
+        signupForm.classList.add('hidden');
+      } else {
+        signupTab.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs';
+        loginTab.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200';
+        signupForm.classList.remove('hidden');
+        loginForm.classList.add('hidden');
+      }
+    }
+
+    function applySignedInUser(userProfile) {
+      state.currentUser = userProfile;
+
+      const sidebarAvatar = document.getElementById('sidebar-user-avatar');
+      sidebarAvatar.className = `w-9 h-9 rounded-xl ${userProfile.avatarColor} flex items-center justify-center text-lg shrink-0 text-white`;
+      sidebarAvatar.textContent = userProfile.avatarEmoji;
+      document.getElementById('sidebar-user-name').textContent = userProfile.username;
+      document.getElementById('sidebar-user-badge').textContent = userProfile.status;
+
+      document.getElementById('auth-modal').classList.add('hidden');
+      startRealtimeListeners();
+    }
+
+    async function handleSignupSubmit(e) {
+      e.preventDefault();
+      clearAuthError();
+
+      const displayUsername = cleanUsernameDisplay(document.getElementById('signup-username').value);
+      const password = document.getElementById('signup-password').value;
+
+      const usernameErr = validateUsername(displayUsername);
+      if (usernameErr) {
+        showAuthError(usernameErr);
+        return;
+      }
+      if (!password || password.length < 6) {
+        showAuthError('Password must be at least 6 characters long.');
+        return;
+      }
+
+      const submitBtn = document.getElementById('signup-submit-btn');
+      const label = document.getElementById('signup-btn-label');
+      const spinner = document.getElementById('signup-spinner');
+
+      submitBtn.disabled = true;
+      label.textContent = 'Creating Account...';
+      spinner.classList.remove('hidden');
+
+      try {
+        const normalized = normalizeUsername(displayUsername);
+        const existing = await fetchAccountRecord(normalized);
+
+        if (existing) {
+          showAuthError(`The username "${displayUsername}" is already taken. Try another or log in!`);
+          return;
+        }
+
+        const salt = generateSalt();
+        const passwordHash = await hashPassword(password, salt);
+        const accountUid = `acct_${normalized.replace(/\s+/g, '_')}`;
+
+        const accountData = {
+          uid: accountUid,
+          username: displayUsername,
+          normalizedUsername: normalized,
+          salt,
+          passwordHash,
+          avatarEmoji: state.signupDraft.avatarEmoji,
+          avatarColor: state.signupDraft.avatarColor,
+          status: state.signupDraft.status
+        };
+
+        await saveAccountRecord(normalized, accountData, true);
+
+        applySignedInUser({
+          uid: accountUid,
+          username: displayUsername,
+          normalizedUsername: normalized,
+          avatarEmoji: state.signupDraft.avatarEmoji,
+          avatarColor: state.signupDraft.avatarColor,
+          status: state.signupDraft.status
+        });
+
+        document.getElementById('signup-password').value = '';
+        showToast(`Welcome to PulseRoom, ${displayUsername}!`, '🎉');
+      } catch (err) {
+        console.error('Signup error:', err);
+        showAuthError(err?.message || 'Could not create account. Please try again.');
+      } finally {
+        submitBtn.disabled = false;
+        label.textContent = 'Create Account & Join';
+        spinner.classList.add('hidden');
+      }
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      clearAuthError();
+
+      const displayUsername = cleanUsernameDisplay(document.getElementById('login-username').value);
+      const password = document.getElementById('login-password').value;
+
+      if (!displayUsername || !password) {
+        showAuthError('Please enter both your username and password.');
+        return;
+      }
+
+      const submitBtn = document.getElementById('login-submit-btn');
+      const label = document.getElementById('login-btn-label');
+      const spinner = document.getElementById('login-spinner');
+
+      submitBtn.disabled = true;
+      label.textContent = 'Logging In...';
+      spinner.classList.remove('hidden');
+
+      try {
+        const normalized = normalizeUsername(displayUsername);
+        const data = await fetchAccountRecord(normalized);
+
+        if (!data) {
+          showAuthError('No account found with that username. Check spelling or create an account.');
+          return;
+        }
+
+        const candidateHash = await hashPassword(password, data.salt);
+
+        if (candidateHash !== data.passwordHash) {
+          showAuthError('Incorrect password for that username. Please try again.');
+          return;
+        }
+
+        applySignedInUser({
+          uid: data.uid || `acct_${normalized.replace(/\s+/g, '_')}`,
+          username: data.username,
+          normalizedUsername: normalized,
+          avatarEmoji: data.avatarEmoji || '🦊',
+          avatarColor: data.avatarColor || 'bg-indigo-500',
+          status: data.status || 'Chilling'
+        });
+
+        document.getElementById('login-password').value = '';
+        showToast(`Welcome back, ${data.username}!`, '👋');
+      } catch (err) {
+        console.error('Login error:', err);
+        showAuthError(err?.message || 'Could not log in. Please try again.');
+      } finally {
+        submitBtn.disabled = false;
+        label.textContent = 'Log In';
+        spinner.classList.add('hidden');
+      }
+    }
+
+    async function handleLogout() {
+      if (state.currentUser) {
+        const offlinePayload = {
+          uid: state.currentUser.uid,
+          username: state.currentUser.username,
+          avatarEmoji: state.currentUser.avatarEmoji,
+          avatarColor: state.currentUser.avatarColor,
+          status: state.currentUser.status,
+          online: false,
+          typingChannel: null,
+          typingAt: 0,
+          lastSeen: Date.now()
+        };
+
+        if (useCloudBackend && db && auth?.currentUser) {
+          try {
+            await setDoc(getPresenceDoc(state.currentUser.uid), {
+              ...offlinePayload,
+              lastSeen: serverTimestamp()
+            }, { merge: true });
+          } catch (e) {
+            // Ignore presence cleanup errors
+          }
+        } else {
+          localMemoryStore.presence.set(state.currentUser.uid, offlinePayload);
+          broadcastLocalSync({ type: 'PRESENCE_UPSERT', presence: offlinePayload });
+        }
+      }
+
+      cleanupRealtimeListeners();
+      state.currentUser = null;
+
+      document.getElementById('sidebar-user-name').textContent = 'Not Signed In';
+      document.getElementById('sidebar-user-badge').textContent = 'Chilling';
+      document.getElementById('auth-modal').classList.remove('hidden');
+      switchAuthTab('login');
+      showToast('You have logged out.', '🚪');
+    }
+
+    /*************************************************************************
+     * 7. REAL-TIME PRESENCE, TYPING & MESSAGE LISTENERS
+     *************************************************************************/
+    function cleanupRealtimeListeners() {
+      if (state.unsubMessages) {
+        state.unsubMessages();
+        state.unsubMessages = null;
+      }
+      if (state.unsubPresence) {
+        state.unsubPresence();
+        state.unsubPresence = null;
+      }
+      if (state.heartbeatTimer) {
+        clearInterval(state.heartbeatTimer);
+        state.heartbeatTimer = null;
+      }
+      if (state.typingCleanupTimer) {
+        clearInterval(state.typingCleanupTimer);
+        state.typingCleanupTimer = null;
+      }
+      if (state.typingClearTimeout) {
+        clearTimeout(state.typingClearTimeout);
+        state.typingClearTimeout = null;
+      }
+      state.initialMessagesLoaded = false;
+      state.rawPresenceDocs = [];
+      renderTypingIndicator();
+    }
+
+    async function updatePresenceHeartbeat(extraFields = {}) {
+      if (!state.currentUser) return;
+
+      const basePresence = {
+        uid: state.currentUser.uid,
+        username: state.currentUser.username,
+        avatarEmoji: state.currentUser.avatarEmoji,
+        avatarColor: state.currentUser.avatarColor,
+        status: state.currentUser.status,
+        online: true,
+        ...extraFields
+      };
+
+      if (useCloudBackend && db) {
+        try {
+          const user = await ensureFirebaseAuthSession();
+          if (user) {
+            await setDoc(getPresenceDoc(state.currentUser.uid), {
+              ...basePresence,
+              lastSeen: serverTimestamp()
+            }, { merge: true });
+            return;
+          }
+        } catch (e) {
+          // Silent heartbeat failure handling
+        }
+      }
+
+      const existing = localMemoryStore.presence.get(state.currentUser.uid) || {};
+      const merged = { ...existing, ...basePresence, lastSeen: Date.now() };
+      localMemoryStore.presence.set(state.currentUser.uid, merged);
+      broadcastLocalSync({ type: 'PRESENCE_UPSERT', presence: merged });
+      notifyLocalListeners('presence');
+    }
+
+    function broadcastTypingState(isTyping) {
+      if (!state.currentUser) return;
+
+      if (state.typingClearTimeout) {
+        clearTimeout(state.typingClearTimeout);
+        state.typingClearTimeout = null;
+      }
+
+      if (!isTyping) {
+        state.lastTypingSentAt = 0;
+        updatePresenceHeartbeat({ typingChannel: null, typingAt: 0 });
+        return;
+      }
+
+      const now = Date.now();
+      if (now - state.lastTypingSentAt > 2000) {
+        state.lastTypingSentAt = now;
+        updatePresenceHeartbeat({
+          typingChannel: state.activeChannel,
+          typingAt: now
+        });
+      }
+
+      state.typingClearTimeout = setTimeout(() => {
+        state.lastTypingSentAt = 0;
+        updatePresenceHeartbeat({ typingChannel: null, typingAt: 0 });
+      }, 3500);
+    }
+
+    function renderTypingIndicator() {
+      const indicatorEl = document.getElementById('typing-indicator');
+      const textEl = document.getElementById('typing-text');
+      if (!indicatorEl || !textEl) return;
+
+      const now = Date.now();
+      const myUid = state.currentUser?.uid;
+      const typingUsers = state.rawPresenceDocs
+        .filter(
+          (u) =>
+            u.uid !== myUid &&
+            u.online &&
+            u.typingChannel === state.activeChannel &&
+            now - (u.typingAt || 0) < 4800
+        )
+        .map((u) => u.username);
+
+      if (typingUsers.length === 0) {
+        indicatorEl.classList.add('opacity-0');
+        return;
+      }
+
+      if (typingUsers.length === 1) {
+        textEl.textContent = `${typingUsers[0]} is typing...`;
+      } else if (typingUsers.length === 2) {
+        textEl.textContent = `${typingUsers[0]} and ${typingUsers[1]} are typing...`;
+      } else {
+        textEl.textContent = `${typingUsers[0]}, ${typingUsers[1]}, and ${typingUsers.length - 2} more are typing...`;
+      }
+      indicatorEl.classList.remove('opacity-0');
+    }
+
+    function refreshPresenceAndTyping() {
+      const now = Date.now();
+      const myUid = state.currentUser?.uid;
+      const activeList = state.rawPresenceDocs.filter((data) => {
+        const lastSeenMs = getTimestampMillis(data.lastSeen);
+        return data.online && (now - lastSeenMs < 90000 || data.uid === myUid);
+      });
+
+      activeList.sort((a, b) => {
+        if (a.uid === myUid) return -1;
+        if (b.uid === myUid) return 1;
+        return (a.username || '').localeCompare(b.username || '');
+      });
+
+      state.onlineMembers = activeList;
+      renderOnlineUsers();
+      renderTypingIndicator();
+    }
+
+    function handleIncomingMessagesSnapshot(fetched) {
+      const myUid = state.currentUser?.uid;
+      const prevIds = new Set(state.allMessages.map((m) => m.id));
+
+      fetched.sort((a, b) => getTimestampMillis(a.createdAt) - getTimestampMillis(b.createdAt));
+
+      if (state.initialMessagesLoaded) {
+        fetched.forEach((msg) => {
+          if (!prevIds.has(msg.id) && msg.uid !== myUid) {
+            if (msg.channel === state.activeChannel) {
+              playPopSound();
+            } else {
+              const ch = CHANNELS.find((c) => c.id === msg.channel);
+              if (ch) ch.unread += 1;
+            }
+          }
+        });
+      }
+
+      state.allMessages = fetched;
+      state.initialMessagesLoaded = true;
+      renderChannelList();
+      renderMessages();
+    }
+
+    async function startRealtimeListeners() {
+      if (!state.currentUser) return;
+      cleanupRealtimeListeners();
+
+      state.forceScrollNextRender = true;
+
+      // Start Presence Heartbeat & Typing Cleanup
+      updatePresenceHeartbeat({ typingChannel: null, typingAt: 0 });
+      state.heartbeatTimer = setInterval(() => updatePresenceHeartbeat(), 25000);
+      state.typingCleanupTimer = setInterval(refreshPresenceAndTyping, 3000);
+
+      if (useCloudBackend && db) {
+        const user = await ensureFirebaseAuthSession();
+        if (user) {
+          state.unsubPresence = onSnapshot(
+            getPresenceCol(),
+            (snapshot) => {
+              const docs = [];
+              snapshot.forEach((docSnap) => {
+                docs.push(docSnap.data());
+              });
+              state.rawPresenceDocs = docs;
+              refreshPresenceAndTyping();
+            },
+            (error) => {
+              console.error('Presence listener error:', error);
+            }
+          );
+
+          state.unsubMessages = onSnapshot(
+            getMessagesCol(),
+            (snapshot) => {
+              const fetched = [];
+              snapshot.forEach((docSnap) => {
+                fetched.push({ id: docSnap.id, ...docSnap.data() });
+              });
+              handleIncomingMessagesSnapshot(fetched);
+            },
+            (error) => {
+              console.error('Messages listener error:', error);
+              showToast('Unable to sync live messages right now.', '⚠️');
+            }
+          );
+          return;
+        }
+      }
+
+      // Fallback Local / Multi-Tab Listeners
+      const syncLocalPresence = () => {
+        state.rawPresenceDocs = Array.from(localMemoryStore.presence.values());
+        refreshPresenceAndTyping();
+      };
+      const syncLocalMessages = () => {
+        handleIncomingMessagesSnapshot(Array.from(localMemoryStore.messages.values()));
+      };
+
+      localMemoryStore.listeners.presence.add(syncLocalPresence);
+      localMemoryStore.listeners.messages.add(syncLocalMessages);
+
+      state.unsubPresence = () => localMemoryStore.listeners.presence.delete(syncLocalPresence);
+      state.unsubMessages = () => localMemoryStore.listeners.messages.delete(syncLocalMessages);
+
+      syncLocalPresence();
+      syncLocalMessages();
+    }
+
+    /*************************************************************************
+     * 8. RENDERING: CHANNELS, MESSAGES & ONLINE MEMBERS
+     *************************************************************************/
+    function renderChannelList() {
+      const nav = document.getElementById('channel-list');
+      if (!nav) return;
+
+      nav.innerHTML = CHANNELS.map((ch) => {
+        const isActive = ch.id === state.activeChannel;
+        return `
+          <button
+            type="button"
+            data-channel-id="${ch.id}"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+              isActive
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
+            }"
+          >
+            <span class="flex items-center gap-2.5 truncate">
+              <span class="text-base">${ch.icon}</span>
+              <span class="truncate"># ${ch.name}</span>
+            </span>
+            ${
+              ch.unread > 0 && !isActive
+                ? `<span class="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white">${ch.unread}</span>`
+                : ''
+            }
+          </button>
+        `;
+      }).join('');
+
+      nav.querySelectorAll('[data-channel-id]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          switchChannel(btn.dataset.channelId);
+          closeMobileDrawers();
+        });
+      });
+    }
+
+    function switchChannel(channelId) {
+      const ch = CHANNELS.find((c) => c.id === channelId);
+      if (!ch) return;
+      state.activeChannel = channelId;
+      state.forceScrollNextRender = true;
+      ch.unread = 0;
+
+      document.getElementById('header-channel-icon').textContent = ch.icon;
+      document.getElementById('header-channel-name').textContent = `# ${ch.name}`;
+      document.getElementById('header-channel-desc').textContent = ch.desc;
+      document.getElementById('message-input').placeholder = `Message #${ch.name}... (Enter to send, Shift+Enter for new line)`;
+
+      broadcastTypingState(false);
+      clearReply();
+      renderChannelList();
+      renderMessages();
+      renderTypingIndicator();
+    }
+
+    function renderMessages() {
+      const container = document.getElementById('messages-container');
+      if (!container) return;
+
+      const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 140;
+      const shouldAutoScroll = wasNearBottom || state.forceScrollNextRender;
+      state.forceScrollNextRender = false;
+
+      const channel = CHANNELS.find((c) => c.id === state.activeChannel);
+      const channelMsgs = state.allMessages.filter((m) => m.channel === state.activeChannel);
+      const myUid = state.currentUser?.uid;
+
+      const bannerHTML = `
+        <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-500/10 via-violet-500/5 to-transparent border border-indigo-200/70 dark:border-indigo-500/20 mb-2">
+          <div class="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl mb-3 shadow-md shadow-indigo-600/20">
+            ${channel?.icon || '💬'}
+          </div>
+          <h3 class="font-bold text-base sm:text-lg">Welcome to #${channel?.name || 'general'}!</h3>
+          <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">${channel?.desc || ''}</p>
+        </div>
+      `;
+
+      if (channelMsgs.length === 0) {
+        container.innerHTML = `
+          ${bannerHTML}
+          <div class="py-10 text-center text-slate-400 dark:text-slate-500 text-sm">
+            No messages in #${channel?.name || 'general'} yet. Be the first to say hello! 👋
+          </div>
+        `;
+        return;
+      }
+
+      const messagesHTML = channelMsgs.map((msg, idx) => {
+        const isMe = msg.uid === myUid;
+        const prevMsg = idx > 0 ? channelMsgs[idx - 1] : null;
+        const isGrouped =
+          prevMsg &&
+          prevMsg.uid === msg.uid &&
+          Math.abs(getTimestampMillis(msg.createdAt) - getTimestampMillis(prevMsg.createdAt)) < 180000;
+
+        const reactions = msg.reactions || {};
+        const reactionPills = Object.entries(reactions)
+          .filter(([, users]) => Array.isArray(users) && users.length > 0)
+          .map(([emoji, users]) => {
+            const reactedByMe = myUid && users.includes(myUid);
+            return `
+              <button
+                type="button"
+                data-react-msg="${msg.id}"
+                data-react-emoji="${emoji}"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition ${
+                  reactedByMe
+                    ? 'bg-indigo-100 dark:bg-indigo-500/25 border-indigo-400 dark:border-indigo-500/60 text-indigo-700 dark:text-indigo-200'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-400'
+                }"
+              >
+                <span>${emoji}</span>
+                <span>${users.length}</span>
+              </button>
+            `;
+          })
+          .join('');
+
+        const replyQuoteHTML = msg.replyTo
+          ? `
+            <button
+              type="button"
+              data-jump-msg="${msg.replyTo.id}"
+              class="mb-1.5 w-full text-left px-2.5 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 border-l-2 border-indigo-400 text-[11px] hover:opacity-80 transition block"
+            >
+              <span class="font-semibold text-indigo-600 dark:text-indigo-300">↩ ${escapeHTML(msg.replyTo.username)}</span>
+              <p class="truncate opacity-80">${escapeHTML(msg.replyTo.text)}</p>
+            </button>
+          `
+          : '';
+
+        const isConfirmingDelete = state.confirmDeleteId === msg.id;
+
+        return `
+          <div id="msg-${msg.id}" class="group flex items-start gap-3 ${isGrouped ? 'mt-1' : 'mt-4'} ${isMe ? 'flex-row-reverse' : ''} animate-popIn">
+            <!-- Avatar Column -->
+            <div class="w-9 shrink-0 flex justify-center">
+              ${
+                isGrouped
+                  ? `<span class="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition mt-2">${formatTime(msg.createdAt)}</span>`
+                  : `<div class="w-9 h-9 rounded-xl ${msg.avatarColor || 'bg-indigo-500'} flex items-center justify-center text-lg shadow-xs text-white">${msg.avatarEmoji || '🦊'}</div>`
+              }
+            </div>
+
+            <!-- Bubble & Metadata Column -->
+            <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[82%] sm:max-w-[72%]">
+              ${
+                isGrouped
+                  ? ''
+                  : `
+                    <div class="flex items-center gap-2 mb-1 px-1 ${isMe ? 'flex-row-reverse' : ''}">
+                      <span class="text-xs font-bold ${isMe ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-200'}">
+                        ${escapeHTML(msg.username)}${isMe ? ' (You)' : ''}
+                      </span>
+                      ${
+                        msg.status
+                          ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">${escapeHTML(msg.status)}</span>`
+                          : ''
+                      }
+                      <span class="text-[10px] text-slate-400">${formatTime(msg.createdAt)}</span>
+                    </div>
+                  `
+              }
+
+              <div class="px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-xs ${
+                isMe
+                  ? 'bg-indigo-600 text-white rounded-tr-sm'
+                  : 'bg-white dark:bg-slate-800/95 text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700/80 rounded-tl-sm'
+              }">
+                ${replyQuoteHTML}
+                <div>${formatMessageHTML(msg.text)}</div>
+              </div>
+
+              ${reactionPills ? `<div class="flex flex-wrap gap-1 mt-1.5">${reactionPills}</div>` : ''}
+
+              <!-- Hover / Tap Action Bar -->
+              <div class="opacity-0 group-hover:opacity-100 group-active:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-1 mt-1">
+                ${QUICK_REACTIONS.map(
+                  (emoji) => `
+                    <button
+                      type="button"
+                      data-react-msg="${msg.id}"
+                      data-react-emoji="${emoji}"
+                      class="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:scale-110 transition text-xs flex items-center justify-center shadow-2xs"
+                      title="React ${emoji}"
+                    >
+                      ${emoji}
+                    </button>
+                  `
+                ).join('')}
+                <button
+                  type="button"
+                  data-reply-msg="${msg.id}"
+                  class="px-2 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 text-[11px] font-medium transition shadow-2xs"
+                >
+                  ↩ Reply
+                </button>
+                ${
+                  isMe
+                    ? `
+                      <button
+                        type="button"
+                        data-delete-msg="${msg.id}"
+                        class="px-2 h-6 rounded-lg border text-[11px] font-medium transition shadow-2xs ${
+                          isConfirmingDelete
+                            ? 'bg-rose-600 text-white border-rose-600'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-600'
+                        }"
+                      >
+                        ${isConfirmingDelete ? 'Confirm?' : '🗑️'}
+                      </button>
+                    `
+                    : ''
+                }
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = bannerHTML + messagesHTML;
+
+      // Wire reaction buttons
+      container.querySelectorAll('[data-react-msg]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          toggleReaction(btn.dataset.reactMsg, btn.dataset.reactEmoji);
+        });
+      });
+
+      // Wire reply buttons
+      container.querySelectorAll('[data-reply-msg]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = channelMsgs.find((m) => m.id === btn.dataset.replyMsg);
+          if (target) setReply(target);
+        });
+      });
+
+      // Wire delete buttons (two-click confirmation)
+      container.querySelectorAll('[data-delete-msg]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const msgId = btn.dataset.deleteMsg;
+          if (state.confirmDeleteId === msgId) {
+            state.confirmDeleteId = null;
+            deleteOwnMessage(msgId);
+          } else {
+            state.confirmDeleteId = msgId;
+            renderMessages();
+            setTimeout(() => {
+              if (state.confirmDeleteId === msgId) {
+                state.confirmDeleteId = null;
+                renderMessages();
+              }
+            }, 3500);
+          }
+        });
+      });
+
+      // Wire jump-to-quoted-message buttons
+      container.querySelectorAll('[data-jump-msg]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const el = document.getElementById(`msg-${btn.dataset.jumpMsg}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-indigo-500', 'rounded-2xl');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-500', 'rounded-2xl'), 1400);
+          }
+        });
+      });
+
+      if (shouldAutoScroll) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+
+    function renderOnlineUsers() {
+      const list = document.getElementById('online-users-list');
+      const countBadge = document.getElementById('online-count-badge');
+      const mobileCount = document.getElementById('mobile-online-count');
+      if (!list) return;
+
+      const count = state.onlineMembers.length;
+      if (countBadge) countBadge.textContent = String(count);
+      if (mobileCount) mobileCount.textContent = `${count} Online`;
+
+      if (count === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">No members online yet.</p>`;
+        return;
+      }
+
+      const myUid = state.currentUser?.uid;
+      list.innerHTML = state.onlineMembers
+        .map((member) => {
+          const isMe = member.uid === myUid;
+          return `
+            <button
+              type="button"
+              data-mention-user="${escapeHTML(member.username)}"
+              class="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition text-left"
+            >
+              <div class="relative shrink-0">
+                <div class="w-8 h-8 rounded-xl ${member.avatarColor || 'bg-indigo-500'} flex items-center justify-center text-base text-white">
+                  ${member.avatarEmoji || '🦊'}
+                </div>
+                <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900"></span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="text-xs font-semibold truncate">
+                  ${escapeHTML(member.username)}${isMe ? ' (You)' : ''}
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                  ${escapeHTML(member.status || 'Chilling')}
+                </div>
+              </div>
+            </button>
+          `;
+        })
+        .join('');
+
+      list.querySelectorAll('[data-mention-user]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const input = document.getElementById('message-input');
+          const mentionTag = `@${btn.dataset.mentionUser.replace(/\s+/g, '_')} `;
+          input.value = input.value ? `${input.value.trimEnd()} ${mentionTag}` : mentionTag;
+          input.focus();
+          document.getElementById('char-counter').textContent = `${input.value.length}/400`;
+          closeMobileDrawers();
+        });
+      });
+    }
+
+    /*************************************************************************
+     * 9. MESSAGE ACTIONS (SEND, REACT, REPLY, DELETE)
+     *************************************************************************/
+    async function sendUserMessage(rawText) {
+      if (!state.currentUser) {
+        showToast('Please log in or create an account first.', '🔒');
+        return;
+      }
+
+      const filteredText = filterMessageText(rawText.trim());
+      if (!filteredText) return;
+
+      const basePayload = {
+        channel: state.activeChannel,
+        uid: state.currentUser.uid,
+        username: state.currentUser.username,
+        avatarEmoji: state.currentUser.avatarEmoji,
+        avatarColor: state.currentUser.avatarColor,
+        status: state.currentUser.status,
+        text: filteredText,
+        replyTo: state.replyingTo ? { ...state.replyingTo } : null,
+        reactions: {}
+      };
+
+      clearReply();
+
+      if (useCloudBackend && db) {
+        try {
+          const user = await ensureFirebaseAuthSession();
+          if (user) {
+            await addDoc(getMessagesCol(), {
+              ...basePayload,
+              createdAt: serverTimestamp()
+            });
+            updatePresenceHeartbeat({ typingChannel: null, typingAt: 0 });
+            return;
+          }
+        } catch (err) {
+          console.error('Send message error:', err);
+          showToast('Could not send message. Please try again.', '⚠️');
+          return;
+        }
+      }
+
+      const localMsg = {
+        ...basePayload,
+        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: Date.now()
+      };
+      localMemoryStore.messages.set(localMsg.id, localMsg);
+      broadcastLocalSync({ type: 'MESSAGE_UPSERT', message: localMsg });
+      notifyLocalListeners('messages');
+      updatePresenceHeartbeat({ typingChannel: null, typingAt: 0 });
+    }
+
+    async function toggleReaction(msgId, emoji) {
+      if (!state.currentUser) return;
+      const msg = state.allMessages.find((m) => m.id === msgId);
+      if (!msg) return;
+
+      const myUid = state.currentUser.uid;
+      const currentReactors = Array.isArray(msg.reactions?.[emoji]) ? msg.reactions[emoji] : [];
+      const hasReacted = currentReactors.includes(myUid);
+
+      if (useCloudBackend && db) {
+        try {
+          const user = await ensureFirebaseAuthSession();
+          if (user) {
+            await updateDoc(getMessageDoc(msgId), {
+              [`reactions.${emoji}`]: hasReacted ? arrayRemove(myUid) : arrayUnion(myUid)
+            });
+            return;
+          }
+        } catch (err) {
+          console.error('Reaction error:', err);
+          return;
+        }
+      }
+
+      const localMsg = localMemoryStore.messages.get(msgId);
+      if (localMsg) {
+        const nextUsers = hasReacted
+          ? currentReactors.filter((id) => id !== myUid)
+          : [...currentReactors, myUid];
+        localMsg.reactions = { ...(localMsg.reactions || {}), [emoji]: nextUsers };
+        broadcastLocalSync({ type: 'MESSAGE_UPSERT', message: localMsg });
+        notifyLocalListeners('messages');
+      }
+    }
+
+    async function deleteOwnMessage(msgId) {
+      if (!state.currentUser) return;
+
+      if (useCloudBackend && db) {
+        try {
+          const user = await ensureFirebaseAuthSession();
+          if (user) {
+            await deleteDoc(getMessageDoc(msgId));
+            showToast('Message deleted.', '🗑️');
+            return;
+          }
+        } catch (err) {
+          console.error('Delete message error:', err);
+          showToast('Could not delete message.', '⚠️');
+          return;
+        }
+      }
+
+      localMemoryStore.messages.delete(msgId);
+      broadcastLocalSync({ type: 'MESSAGE_DELETE', id: msgId });
+      notifyLocalListeners('messages');
+      showToast('Message deleted.', '🗑️');
+    }
+
+    function setReply(msg) {
+      state.replyingTo = {
+        id: msg.id,
+        username: msg.username,
+        text: msg.text
+      };
+      document.getElementById('reply-target-name').textContent = msg.username;
+      document.getElementById('reply-target-text').textContent = msg.text;
+      document.getElementById('reply-banner').classList.remove('hidden');
+      document.getElementById('message-input').focus();
+    }
+
+    function clearReply() {
+      state.replyingTo = null;
+      document.getElementById('reply-banner').classList.add('hidden');
+    }
+
+    /*************************************************************************
+     * 10. PROFILE SELECTORS & EDIT PROFILE MODAL
+     *************************************************************************/
+    function renderProfileSelectors(prefix, draftObj, updatePreviewFn) {
+      const badgeContainer = document.getElementById(`${prefix}-badge-selector`);
+      const emojiContainer = document.getElementById(`${prefix}-emoji-grid`);
+      const colorContainer = document.getElementById(`${prefix}-color-grid`);
+
+      if (badgeContainer) {
+        badgeContainer.innerHTML = STATUS_TAGS.map(
+          (tag) => `
+            <button
+              type="button"
+              data-tag="${tag}"
+              class="px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
+                draftObj.status === tag
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+              }"
+            >
+              ${tag}
+            </button>
+          `
+        ).join('');
+
+        badgeContainer.querySelectorAll('[data-tag]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            draftObj.status = btn.dataset.tag;
+            renderProfileSelectors(prefix, draftObj, updatePreviewFn);
+            updatePreviewFn();
+          });
+        });
+      }
+
+      if (emojiContainer) {
+        emojiContainer.innerHTML = AVATAR_EMOJIS.map(
+          (emoji) => `
+            <button
+              type="button"
+              data-emoji="${emoji}"
+              class="h-8 rounded-lg flex items-center justify-center text-base transition ${
+                draftObj.avatarEmoji === emoji
+                  ? 'bg-indigo-100 dark:bg-indigo-500/30 ring-2 ring-indigo-500'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }"
+            >
+              ${emoji}
+            </button>
+          `
+        ).join('');
+
+        emojiContainer.querySelectorAll('[data-emoji]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            draftObj.avatarEmoji = btn.dataset.emoji;
+            renderProfileSelectors(prefix, draftObj, updatePreviewFn);
+            updatePreviewFn();
+          });
+        });
+      }
+
+      if (colorContainer) {
+        colorContainer.innerHTML = AVATAR_COLORS.map(
+          (color) => `
+            <button
+              type="button"
+              data-color="${color}"
+              class="w-7 h-7 rounded-full ${color} transition transform ${
+                draftObj.avatarColor === color
+                  ? 'ring-2 ring-offset-2 ring-indigo-500 dark:ring-offset-slate-900 scale-110'
+                  : 'opacity-80 hover:opacity-100'
+              }"
+              aria-label="${color}"
+            ></button>
+          `
+        ).join('');
+
+        colorContainer.querySelectorAll('[data-color]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            draftObj.avatarColor = btn.dataset.color;
+            renderProfileSelectors(prefix, draftObj, updatePreviewFn);
+            updatePreviewFn();
+          });
+        });
+      }
+    }
+
+    function updateSignupPreview() {
+      const nameVal = cleanUsernameDisplay(document.getElementById('signup-username').value) || state.signupDraft.username;
+      const avatarEl = document.getElementById('signup-preview-avatar');
+      avatarEl.className = `w-12 h-12 rounded-2xl ${state.signupDraft.avatarColor} flex items-center justify-center text-2xl shadow-inner shrink-0 transition-colors duration-200 text-white`;
+      avatarEl.textContent = state.signupDraft.avatarEmoji;
+      document.getElementById('signup-preview-name').textContent = nameVal;
+      document.getElementById('signup-preview-badge').textContent = state.signupDraft.status;
+    }
+
+    function updateEditPreview() {
+      const nameVal = cleanUsernameDisplay(document.getElementById('edit-username-input').value) || state.editDraft.username;
+      const avatarEl = document.getElementById('edit-preview-avatar');
+      avatarEl.className = `w-12 h-12 rounded-2xl ${state.editDraft.avatarColor} flex items-center justify-center text-2xl shadow-inner shrink-0 transition-colors text-white`;
+      avatarEl.textContent = state.editDraft.avatarEmoji;
+      document.getElementById('edit-preview-name').textContent = nameVal;
+      document.getElementById('edit-preview-badge').textContent = state.editDraft.status;
+    }
+
+    function openEditProfileModal() {
+      if (!state.currentUser) return;
+      state.editDraft = {
+        username: state.currentUser.username,
+        avatarEmoji: state.currentUser.avatarEmoji,
+        avatarColor: state.currentUser.avatarColor,
+        status: state.currentUser.status
+      };
+      document.getElementById('edit-username-input').value = state.editDraft.username;
+      renderProfileSelectors('edit', state.editDraft, updateEditPreview);
+      updateEditPreview();
+      document.getElementById('edit-profile-modal').classList.remove('hidden');
+    }
+
+    function closeEditProfileModal() {
+      document.getElementById('edit-profile-modal').classList.add('hidden');
+    }
+
+    async function handleEditProfileSubmit(e) {
+      e.preventDefault();
+      if (!state.currentUser) return;
+
+      const newUsername = cleanUsernameDisplay(document.getElementById('edit-username-input').value);
+      const usernameErr = validateUsername(newUsername);
+      if (usernameErr) {
+        showToast(usernameErr, '⚠️');
+        return;
+      }
+
+      const oldNormalized = state.currentUser.normalizedUsername;
+      const newNormalized = normalizeUsername(newUsername);
+
+      try {
+        if (newNormalized !== oldNormalized) {
+          const existingRecord = await fetchAccountRecord(newNormalized);
+          if (existingRecord) {
+            showToast(`Username "${newUsername}" is already taken.`, '⚠️');
+            return;
+          }
+
+          const oldData = (await fetchAccountRecord(oldNormalized)) || {};
+
+          await saveAccountRecord(newNormalized, {
+            ...oldData,
+            uid: state.currentUser.uid,
+            username: newUsername,
+            normalizedUsername: newNormalized,
+            avatarEmoji: state.editDraft.avatarEmoji,
+            avatarColor: state.editDraft.avatarColor,
+            status: state.editDraft.status
+          });
+
+          await removeAccountRecord(oldNormalized);
+        } else {
+          const oldData = (await fetchAccountRecord(oldNormalized)) || {};
+          await saveAccountRecord(oldNormalized, {
+            ...oldData,
+            uid: state.currentUser.uid,
+            username: newUsername,
+            normalizedUsername: oldNormalized,
+            avatarEmoji: state.editDraft.avatarEmoji,
+            avatarColor: state.editDraft.avatarColor,
+            status: state.editDraft.status
+          });
+        }
+
+        applySignedInUser({
+          uid: state.currentUser.uid,
+          username: newUsername,
+          normalizedUsername: newNormalized,
+          avatarEmoji: state.editDraft.avatarEmoji,
+          avatarColor: state.editDraft.avatarColor,
+          status: state.editDraft.status
+        });
+
+        closeEditProfileModal();
+        showToast('Profile updated!', '✨');
+      } catch (err) {
+        console.error('Update profile error:', err);
+        showToast('Could not update profile right now.', '⚠️');
+      }
+    }
+
+    /*************************************************************************
+     * 11. UI INITIALIZATION & EVENT WIRING
+     *************************************************************************/
+    function closeMobileDrawers() {
+      document.getElementById('left-sidebar').classList.add('-translate-x-full');
+      document.getElementById('right-sidebar').classList.add('translate-x-full');
+      document.getElementById('mobile-backdrop').classList.add('hidden');
+    }
+
+    function initUI() {
+      updateConnectionModeBadge();
+
+      // Pre-warm Firebase Auth session immediately on page load
+      if (useCloudBackend) {
+        ensureFirebaseAuthSession().catch(() => {});
+      }
+
+      // Auth Tabs & Forms
+      document.getElementById('tab-login-btn').addEventListener('click', () => switchAuthTab('login'));
+      document.getElementById('tab-signup-btn').addEventListener('click', () => switchAuthTab('signup'));
+      document.getElementById('switch-to-signup-link').addEventListener('click', () => switchAuthTab('signup'));
+      document.getElementById('switch-to-login-link').addEventListener('click', () => switchAuthTab('login'));
+      document.getElementById('login-form').addEventListener('submit', handleLoginSubmit);
+      document.getElementById('signup-form').addEventListener('submit', handleSignupSubmit);
+
+      // Password Visibility Toggle Buttons
+      document.querySelectorAll('.toggle-pass-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = document.getElementById(btn.dataset.togglePass);
+          if (!target) return;
+          target.type = target.type === 'password' ? 'text' : 'password';
+        });
+      });
+
+      // Signup Randomize Username & Live Preview
+      const signupUsernameInput = document.getElementById('signup-username');
+      signupUsernameInput.value = state.signupDraft.username;
+      signupUsernameInput.addEventListener('input', updateSignupPreview);
+
+      document.getElementById('signup-random-name-btn').addEventListener('click', () => {
+        const randomName = generateRandomUsername();
+        state.signupDraft.username = randomName;
+        signupUsernameInput.value = randomName;
+        updateSignupPreview();
+      });
+
+      renderProfileSelectors('signup', state.signupDraft, updateSignupPreview);
+      updateSignupPreview();
+
+      // Edit Profile Modal Controls
+      document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
+      document.getElementById('close-edit-modal-btn').addEventListener('click', closeEditProfileModal);
+      document.getElementById('edit-username-input').addEventListener('input', updateEditPreview);
+      document.getElementById('edit-profile-form').addEventListener('submit', handleEditProfileSubmit);
+
+      // Logout Button
+      document.getElementById('logout-btn').addEventListener('click', handleLogout);
+
+      // Mobile Drawers
+      document.getElementById('open-left-drawer-btn').addEventListener('click', () => {
+        document.getElementById('left-sidebar').classList.remove('-translate-x-full');
+        document.getElementById('mobile-backdrop').classList.remove('hidden');
+      });
+
+      document.getElementById('open-right-drawer-btn').addEventListener('click', () => {
+        document.getElementById('right-sidebar').classList.remove('translate-x-full');
+        document.getElementById('mobile-backdrop').classList.remove('hidden');
+      });
+
+      document.getElementById('mobile-backdrop').addEventListener('click', closeMobileDrawers);
+
+      // Theme, Sound & Profanity Filter Toggles
+      const themeBtn = document.getElementById('theme-toggle-btn');
+      themeBtn.addEventListener('click', () => {
+        const html = document.documentElement;
+        const isDark = html.classList.toggle('dark');
+        themeBtn.textContent = isDark ? '☀️' : '🌙';
+      });
+
+      const soundBtn = document.getElementById('sound-toggle-btn');
+      soundBtn.addEventListener('click', () => {
+        state.soundEnabled = !state.soundEnabled;
+        soundBtn.textContent = state.soundEnabled ? '🔔' : '🔕';
+        showToast(state.soundEnabled ? 'Notification sounds on' : 'Notification sounds muted', state.soundEnabled ? '🔔' : '🔕');
+      });
+
+      const filterBtn = document.getElementById('filter-status-btn');
+      filterBtn.addEventListener('click', () => {
+        state.filterEnabled = !state.filterEnabled;
+        document.getElementById('filter-status-text').textContent = state.filterEnabled ? 'Filter: On' : 'Filter: Off';
+        renderMessages();
+      });
+
+      // Composer Emoji Picker
+      const emojiGrid = document.getElementById('composer-emoji-grid');
+      const emojiPopover = document.getElementById('emoji-picker-popover');
+      const input = document.getElementById('message-input');
+      const charCounter = document.getElementById('char-counter');
+
+      emojiGrid.innerHTML = COMPOSER_EMOJIS.map(
+        (emoji) => `
+          <button type="button" data-insert-emoji="${emoji}" class="h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-base flex items-center justify-center transition">
+            ${emoji}
+          </button>
+        `
+      ).join('');
+
+      emojiGrid.querySelectorAll('[data-insert-emoji]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          input.value += btn.dataset.insertEmoji;
+          charCounter.textContent = `${input.value.length}/400`;
+          input.focus();
+        });
+      });
+
+      document.getElementById('emoji-picker-btn').addEventListener('click', () => {
+        emojiPopover.classList.toggle('hidden');
+      });
+
+      document.getElementById('close-emoji-picker').addEventListener('click', () => {
+        emojiPopover.classList.add('hidden');
+      });
+
+      document.getElementById('cancel-reply-btn').addEventListener('click', clearReply);
+
+      // Composer Form & Keyboard Shortcuts
+      const form = document.getElementById('message-form');
+
+      input.addEventListener('input', () => {
+        charCounter.textContent = `${input.value.length}/400`;
+        input.style.height = 'auto';
+        input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
+        broadcastTypingState(input.value.trim().length > 0);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = input.value;
+        if (!text.trim()) return;
+        input.value = '';
+        input.style.height = 'auto';
+        charCounter.textContent = '0/400';
+        emojiPopover.classList.add('hidden');
+        broadcastTypingState(false);
+        state.forceScrollNextRender = true;
+        await sendUserMessage(text);
+      });
+
+      // Render initial channels & welcome feed
+      renderChannelList();
+      renderMessages();
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (state.currentUser) {
+        const offlinePayload = {
+          uid: state.currentUser.uid,
+          username: state.currentUser.username,
+          avatarEmoji: state.currentUser.avatarEmoji,
+          avatarColor: state.currentUser.avatarColor,
+          status: state.currentUser.status,
+          online: false,
+          typingChannel: null,
+          typingAt: 0,
+          lastSeen: Date.now()
+        };
+
+        if (useCloudBackend && db && auth?.currentUser) {
+          setDoc(getPresenceDoc(state.currentUser.uid), {
+            ...offlinePayload,
+            lastSeen: serverTimestamp()
+          }, { merge: true }).catch(() => {});
+        } else {
+          localMemoryStore.presence.set(state.currentUser.uid, offlinePayload);
+          broadcastLocalSync({ type: 'PRESENCE_UPSERT', presence: offlinePayload });
+        }
+      }
+    });
+
+    initUI();
+  </script>
+</body>
+</html>
